@@ -1,7 +1,7 @@
 extern crate iced;
 extern crate rodio;
 
-use iced::{Checkbox, Column, Container, Element, Length, Sandbox, Settings};
+use iced::{Checkbox, Row,  Column, Container, Element, Length, Sandbox, Settings};
 use rodio::{Decoder, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
@@ -13,14 +13,98 @@ pub fn main() {
 }
 
 #[derive(Debug, Clone)]
+enum PlayerMessage {
+    ChangeVolume(f32),
+    Play,
+    Pause,
+    Stop
+}
+
+struct Player {
+    worker: Option<Sender<PlayerMessage>>,
+    sound_path: String,
+    is_playing: bool,
+    label: String
+}
+
+impl Player {
+    pub fn new(path: String, label: String) -> Self {
+        let player = Player {
+            worker: None,
+            sound_path: path,
+            is_playing: false,
+            label
+        };
+
+        player.start()
+    }
+
+    fn start(mut self) -> Self {
+        let device = rodio::default_output_device().unwrap();
+        let sink = Sink::new(&device);
+        let file = File::open(&self.sound_path).unwrap();
+        let source = Decoder::new(BufReader::new(file)).unwrap();
+
+        let (tx, rx) = channel();
+
+        thread::spawn(move || {
+            sink.append(source.repeat_infinite());
+            sink.pause();
+
+            'player: loop {
+                use PlayerMessage::*;
+
+                let msg = rx.recv();
+                match msg.unwrap() {
+                    ChangeVolume(val) => sink.set_volume(val),
+                    Play => sink.play(),
+                    Pause => sink.pause(),
+                    Stop => break
+                }
+            }
+
+        });
+
+        self.worker = Some(tx);
+        self
+    }
+
+    fn update(&mut self, message: PlayerMessage) {
+        match &self.worker {
+            Some(worker) => {
+                match message {
+                    PlayerMessage::Play => self.is_playing = true,
+                    PlayerMessage::Pause => self.is_playing = false,
+                    PlayerMessage::Stop => self.is_playing = false,
+                    _ => unimplemented!()
+                }
+
+                worker.send(message).unwrap()
+            } ,
+            None => todo!("handle?")
+        }
+        
+    }
+
+    fn view(&mut self) -> Element<PlayerMessage> {
+        let checkbox = Checkbox::new(self.is_playing, &self.label, |state| {
+            match state {
+                true => PlayerMessage::Play,
+                false => PlayerMessage::Pause
+            }
+        });
+
+        Row::new().push(checkbox).into()
+    }
+}
+
+#[derive(Debug, Clone)]
 enum Message {
-    BirdsToggled(bool),
-    OtherToggled(bool),
+    PlayerMessage(usize, PlayerMessage)
 }
 
 struct Miso {
-    bird_worker: Option<Sender<bool>>,
-    other_worker: Option<Sender<bool>>,
+    players: Vec<Player>
 }
 
 impl Sandbox for Miso {
@@ -28,8 +112,10 @@ impl Sandbox for Miso {
 
     fn new() -> Miso {
         Miso {
-            bird_worker: None,
-            other_worker: None,
+            players: vec![
+                Player::new("sounds/birds.wav".to_string(), "Birds".to_string()),
+                Player::new("sounds/waves.wav".to_string(), "Waves".to_string())
+            ]
         }
     }
 
@@ -39,82 +125,29 @@ impl Sandbox for Miso {
 
     fn update(&mut self, message: Self::Message) {
         match message {
-            Message::BirdsToggled(val) => {
-                if val == true {
-                    let device = rodio::default_output_device().unwrap();
-                    let sink = Sink::new(&device);
-                    let file = File::open("birds.wav").unwrap();
-                    let source = Decoder::new(BufReader::new(file)).unwrap();
-
-                    let (tx, rx) = channel();
-                    thread::spawn(move || {
-                        sink.append(source.repeat_infinite());
-
-                        loop {
-                            let msg = rx.recv().unwrap();
-                            if msg == false {
-                                break;
-                            }
-                        }
-                    });
-                    self.bird_worker = Some(tx);
-                } else {
-                    match &self.bird_worker {
-                        Some(sender) => {
-                            let res = sender.send(false);
-                            self.bird_worker = None;
-                        }
-                        None => unimplemented!(),
-                    }
+            Message::PlayerMessage(i, message) => {
+                if let Some(player) = self.players.get_mut(i) {
+                    player.update(message);
                 }
-            }
-            Message::OtherToggled(val) => {
-                if val == true {
-                    let device = rodio::default_output_device().unwrap();
-                    let sink = Sink::new(&device);
-                    let file = File::open("waves.wav").unwrap();
-                    let source = Decoder::new(BufReader::new(file)).unwrap();
-
-                    let (tx, rx) = channel();
-                    thread::spawn(move || {
-                        sink.append(source.repeat_infinite());
-
-                        loop {
-                            let msg = rx.recv().unwrap();
-                            if msg == false {
-                                break;
-                            }
-                        }
-                    });
-                    self.other_worker = Some(tx);
-                } else {
-                    match &self.other_worker {
-                        Some(sender) => {
-                            let res = sender.send(false);
-                            self.other_worker = None;
-                        }
-                        None => unimplemented!(),
-                    }
-                }
-            }
+            } 
         }
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        let checkbox = Checkbox::new(self.bird_worker.is_some(), "Birds", |state| {
-            Message::BirdsToggled(state)
-        });
-
-        let other_checkbox = Checkbox::new(self.other_worker.is_some(), "Waves", |state| {
-            Message::OtherToggled(state)
+        let players = self.players
+            .iter_mut()
+            .enumerate()
+            .fold(Column::new(), |col, (i, player)| {
+                col.push(player.view().map(move |message| {
+                    Message::PlayerMessage(i, message)
+                }))
         });
 
         let content = Column::new()
             .spacing(20)
             .padding(20)
             .max_width(600)
-            .push(checkbox)
-            .push(other_checkbox);
+            .push(players);
 
         Container::new(content)
             .width(Length::Fill)
