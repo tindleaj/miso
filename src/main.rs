@@ -114,7 +114,9 @@ impl Sandbox for Miso {
         Miso {
             players: vec![
                 Player::new("sounds/birds.wav".to_string(), "Birds".to_string()),
-                Player::new("sounds/waves.wav".to_string(), "Waves".to_string())
+                Player::new("sounds/waves.wav".to_string(), "Waves".to_string()),
+                Player::new("sounds/forest_wind.wav".to_string(), "Forest Wind".to_string()),
+                Player::new("sounds/fan.wav".to_string(), "Fan".to_string()),
             ]
         }
     }
