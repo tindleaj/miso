@@ -12,6 +12,7 @@ pub enum PlayerMessage {
     ChangeVolume(f32),
     Play,
     Pause,
+    #[allow(dead_code)]
     Stop,
 }
 
@@ -50,7 +51,8 @@ impl Player {
             sink.append(source.repeat_infinite());
             sink.pause();
 
-            'player: loop {
+            // player
+            loop {
                 use PlayerMessage::*;
 
                 let msg = rx.recv();
