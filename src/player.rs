@@ -12,6 +12,7 @@ pub enum PlayerMessage {
     ChangeVolume(f32),
     Play,
     Pause,
+    #[allow(dead_code)]
     Stop,
 }
 
@@ -50,7 +51,8 @@ impl Player {
             sink.append(source.repeat_infinite());
             sink.pause();
 
-            'player: loop {
+            // player
+            loop {
                 use PlayerMessage::*;
 
                 let msg = rx.recv();
@@ -84,10 +86,17 @@ impl Player {
     }
 
     pub fn view(&mut self) -> Element<PlayerMessage> {
-        let checkbox = Checkbox::new(self.is_playing, &self.label, |state| match state {
-            true => PlayerMessage::Play,
-            false => PlayerMessage::Pause,
-        })
+        let checkbox = Checkbox::new(
+            self.is_playing,
+            &self.label,
+            |state| {
+                if state {
+                    PlayerMessage::Play
+                } else {
+                    PlayerMessage::Pause
+                }
+            },
+        )
         .width(iced::Length::FillPortion(3));
 
         let slider = Slider::new(&mut self.volume_slider, 0.0..=1.0, self.volume, |state| {
