@@ -1,4 +1,4 @@
-# Miso
+# 味噌 - Miso
 
 A cross-platform ambient soundscape generator. No browser included.
 
