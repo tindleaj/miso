@@ -4,7 +4,7 @@ extern crate rodio;
 mod player;
 mod style;
 
-use iced::{Column, Container, Element, Length, Sandbox, Settings};
+use iced::{Column, Container, Element, Length, Sandbox, Settings, scrollable, Scrollable};
 use player::*;
 
 pub fn main() {
@@ -24,6 +24,7 @@ enum Message {
 }
 
 struct Miso {
+    scroll: scrollable::State,
     players: Vec<Player>,
 }
 
@@ -32,6 +33,7 @@ impl Sandbox for Miso {
 
     fn new() -> Miso {
         Miso {
+            scroll: scrollable::State::new(),
             players: vec![
                 Player::new("resources/rain.wav".to_string(), "Rain".to_string()),
                 Player::new(
@@ -124,6 +126,11 @@ impl Sandbox for Miso {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
+        let Miso {
+            scroll,
+            ..
+        } = self;
+
         let players =
             self.players
                 .iter_mut()
@@ -142,7 +149,11 @@ impl Sandbox for Miso {
             .max_width(600)
             .push(players);
 
-        Container::new(content)
+
+        let scrollable = Scrollable::new(scroll)
+            .push(Container::new(content).width(Length::Fill).center_x());
+
+        Container::new(scrollable)
             .width(Length::Fill)
             .height(Length::Fill)
             .style(style::Container)
