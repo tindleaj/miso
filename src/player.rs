@@ -86,17 +86,13 @@ impl Player {
     }
 
     pub fn view(&mut self) -> Element<PlayerMessage> {
-        let checkbox = Checkbox::new(
-            self.is_playing,
-            &self.label,
-            |state| {
-                if state {
-                    PlayerMessage::Play
-                } else {
-                    PlayerMessage::Pause
-                }
-            },
-        )
+        let checkbox = Checkbox::new(self.is_playing, &self.label, |state| {
+            if state {
+                PlayerMessage::Play
+            } else {
+                PlayerMessage::Pause
+            }
+        })
         .width(iced::Length::FillPortion(3));
 
         let slider = Slider::new(&mut self.volume_slider, 0.0..=1.0, self.volume, |state| {
